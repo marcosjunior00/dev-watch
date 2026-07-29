@@ -166,6 +166,16 @@ function App(): React.JSX.Element {
       <section className="container-panel">
         <div className="table-scroller">
           <table>
+            <colgroup>
+              <col className="id-column" />
+              <col className="name-column" />
+              <col className="image-column" />
+              <col className="command-column" />
+              <col className="created-column" />
+              <col className="state-column" />
+              <col className="ports-column" />
+              <col className="networks-column" />
+            </colgroup>
             <thead>
               <tr>
                 <th>ID do container</th>
@@ -181,14 +191,22 @@ function App(): React.JSX.Element {
             <tbody>
               {containers.map((container) => (
                 <tr key={container.id}>
-                  <td>
+                  <td className="id-cell" title={container.id}>
                     <code>{container.id}</code>
                   </td>
-                  <td className="strong-cell">{container.name || '-'}</td>
-                  <td>{container.image || '-'}</td>
-                  <td className="command-cell">{container.command || '-'}</td>
-                  <td>{translateDuration(container.runningFor) || container.createdAt || '-'}</td>
-                  <td>
+                  <td className="strong-cell" title={container.name}>
+                    {container.name || '-'}
+                  </td>
+                  <td className="image-cell" title={container.image}>
+                    {container.image || '-'}
+                  </td>
+                  <td className="command-cell" title={container.command}>
+                    {container.command || '-'}
+                  </td>
+                  <td className="created-cell">
+                    {translateDuration(container.runningFor) || container.createdAt || '-'}
+                  </td>
+                  <td className="state-cell">
                     <span className="status-pill">
                       {translateDockerStatus(container.status) ||
                         translateDockerStatus(container.state) ||
@@ -196,7 +214,9 @@ function App(): React.JSX.Element {
                     </span>
                   </td>
                   <td className="ports-cell">{container.ports || '-'}</td>
-                  <td>{container.networks || '-'}</td>
+                  <td className="networks-cell" title={container.networks}>
+                    {container.networks || '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

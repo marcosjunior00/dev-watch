@@ -140,8 +140,41 @@ h1 {
 
 table {
   width: 100%;
-  min-width: 1040px;
+  min-width: 1360px;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.id-column {
+  width: 130px;
+}
+
+.name-column {
+  width: 190px;
+}
+
+.image-column {
+  width: 230px;
+}
+
+.command-column {
+  width: 180px;
+}
+
+.created-column {
+  width: 120px;
+}
+
+.state-column {
+  width: 220px;
+}
+
+.ports-column {
+  width: 280px;
+}
+
+.networks-column {
+  width: 190px;
 }
 
 thead {
@@ -170,12 +203,17 @@ td {
   color: #e7e7df;
   font-size: 13px;
   line-height: 1.45;
+  word-break: normal;
 }
 
 td code {
+  display: block;
+  overflow: hidden;
   color: #9bd8bc;
   font-size: 12px;
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -185,6 +223,19 @@ tbody tr:hover {
 .strong-cell {
   color: #ffffff;
   font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.image-cell,
+.command-cell,
+.networks-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.created-cell {
+  white-space: normal;
 }
 
 .command-cell,
@@ -202,9 +253,14 @@ tbody tr:hover {
   user-select: text;
 }
 
+.ports-cell {
+  line-break: anywhere;
+  white-space: normal;
+}
+
 .status-pill {
   display: inline-flex;
-  max-width: 220px;
+  max-width: 100%;
   align-items: center;
   padding: 4px 8px;
   border: 1px solid #365747;
@@ -214,6 +270,8 @@ tbody tr:hover {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .empty-state {
