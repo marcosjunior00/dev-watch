@@ -1,4 +1,4 @@
-appId: com.electron.app
+appId: com.devwatch.app
 productName: dev-watch
 directories:
   buildResources: build
@@ -13,6 +13,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: dev-watch
+  icon: build/icon.ico
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

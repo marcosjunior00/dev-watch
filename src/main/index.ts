@@ -3,7 +3,7 @@ import { join } from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../resources/app-icon.png?asset'
 
 const execFileAsync = promisify(execFile)
 
@@ -105,7 +105,7 @@ function createWindow(): void {
     height: 760,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -135,7 +135,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.devwatch.app')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
