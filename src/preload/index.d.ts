@@ -11,6 +11,9 @@ export type DockerContainer = {
   status: string
   name: string
   networks: string
+  labels: Record<string, string>
+  composeProject: string
+  composeService: string
 }
 
 export type AppAPI = {

@@ -1,8 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 type DockerContainer = Awaited<ReturnType<Window['api']['docker']['listRunningContainers']>>[number]
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
+
+type ContainerGroupType = 'compose' | 'network'
+
+type ContainerGroup = {
+  id: string
+  name: string
+  type: ContainerGroupType
+  network: string
+  containers: DockerContainer[]
+  firstIndex: number
+}
+
+type ContainerListItem =
+  | {
+      type: 'container'
+      container: DockerContainer
+      firstIndex: number
+    }
+  | {
+      type: 'group'
+      group: ContainerGroup
+      firstIndex: number
+    }
 
 const durationUnits = {
   second: ['segundo', 'segundos'],
@@ -87,11 +110,108 @@ function translateDockerStatus(value: string): string {
   return translated
 }
 
+function getPrimaryNetwork(networks: string): string {
+  return (
+    networks
+      .split(',')
+      .map((network) => network.trim())
+      .find(Boolean) ?? ''
+  )
+}
+
+function getGroupTypeLabel(type: ContainerGroupType): string {
+  return type === 'compose' ? 'Compose' : 'Rede'
+}
+
+function getGroupInfo(
+  container: DockerContainer
+): Pick<ContainerGroup, 'id' | 'name' | 'type' | 'network'> | null {
+  const primaryNetwork = getPrimaryNetwork(container.networks)
+
+  if (container.composeProject) {
+    return {
+      id: `compose:${container.composeProject}`,
+      name: container.composeProject,
+      type: 'compose',
+      network: primaryNetwork
+    }
+  }
+
+  if (primaryNetwork && !['bridge', 'host', 'none'].includes(primaryNetwork)) {
+    return {
+      id: `network:${primaryNetwork}`,
+      name: primaryNetwork,
+      type: 'network',
+      network: primaryNetwork
+    }
+  }
+
+  return null
+}
+
+function getContainerDisplayName(container: DockerContainer): string {
+  return container.composeService || container.name || '-'
+}
+
+function buildContainerList(containers: DockerContainer[]): ContainerListItem[] {
+  const groups = new Map<string, ContainerGroup>()
+  const standaloneItems: ContainerListItem[] = []
+
+  containers.forEach((container, index) => {
+    const groupInfo = getGroupInfo(container)
+
+    if (!groupInfo) {
+      standaloneItems.push({
+        type: 'container',
+        container,
+        firstIndex: index
+      })
+      return
+    }
+
+    const group = groups.get(groupInfo.id)
+
+    if (group) {
+      group.containers.push(container)
+      return
+    }
+
+    groups.set(groupInfo.id, {
+      ...groupInfo,
+      containers: [container],
+      firstIndex: index
+    })
+  })
+
+  const groupedItems = Array.from(groups.values()).flatMap<ContainerListItem>((group) => {
+    if (group.type === 'network' && group.containers.length === 1) {
+      return [
+        {
+          type: 'container',
+          container: group.containers[0],
+          firstIndex: group.firstIndex
+        }
+      ]
+    }
+
+    return [
+      {
+        type: 'group',
+        group,
+        firstIndex: group.firstIndex
+      }
+    ]
+  })
+
+  return [...standaloneItems, ...groupedItems].sort((a, b) => a.firstIndex - b.firstIndex)
+}
+
 function App(): React.JSX.Element {
   const [containers, setContainers] = useState<DockerContainer[]>([])
   const [status, setStatus] = useState<LoadStatus>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set())
 
   const isLoading = status === 'loading'
 
@@ -99,6 +219,22 @@ function App(): React.JSX.Element {
     const count = containers.length
     return count === 1 ? '1 container rodando' : `${count} containers rodando`
   }, [containers.length])
+
+  const containerList = useMemo(() => buildContainerList(containers), [containers])
+
+  const toggleGroup = useCallback((groupId: string): void => {
+    setCollapsedGroupIds((currentGroupIds) => {
+      const nextGroupIds = new Set(currentGroupIds)
+
+      if (nextGroupIds.has(groupId)) {
+        nextGroupIds.delete(groupId)
+      } else {
+        nextGroupIds.add(groupId)
+      }
+
+      return nextGroupIds
+    })
+  }, [])
 
   const loadContainers = useCallback(async (): Promise<void> => {
     setStatus('loading')
@@ -189,36 +325,125 @@ function App(): React.JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {containers.map((container) => (
-                <tr key={container.id}>
-                  <td className="id-cell" title={container.id}>
-                    <code>{container.id}</code>
-                  </td>
-                  <td className="strong-cell" title={container.name}>
-                    {container.name || '-'}
-                  </td>
-                  <td className="image-cell" title={container.image}>
-                    {container.image || '-'}
-                  </td>
-                  <td className="command-cell" title={container.command}>
-                    {container.command || '-'}
-                  </td>
-                  <td className="created-cell">
-                    {translateDuration(container.runningFor) || container.createdAt || '-'}
-                  </td>
-                  <td className="state-cell">
-                    <span className="status-pill">
-                      {translateDockerStatus(container.status) ||
-                        translateDockerStatus(container.state) ||
+              {containerList.map((item) => {
+                if (item.type === 'group') {
+                  const isCollapsed = collapsedGroupIds.has(item.group.id)
+                  const containerCount = item.group.containers.length
+                  const groupCountLabel =
+                    containerCount === 1
+                      ? '1 container rodando'
+                      : `${containerCount} containers rodando`
+
+                  return (
+                    <Fragment key={item.group.id}>
+                      <tr className="group-row">
+                        <td className="id-cell">
+                          <span className="group-placeholder">-</span>
+                        </td>
+                        <td className="group-name-cell" title={item.group.name}>
+                          <button
+                            className="group-toggle"
+                            type="button"
+                            aria-label={
+                              isCollapsed
+                                ? `Expandir grupo ${item.group.name}`
+                                : `Recolher grupo ${item.group.name}`
+                            }
+                            onClick={() => toggleGroup(item.group.id)}
+                          >
+                            <span
+                              className={
+                                isCollapsed ? 'group-chevron' : 'group-chevron is-expanded'
+                              }
+                            />
+                          </button>
+                          <span className="group-status-dot" />
+                          <span className="group-name">{item.group.name}</span>
+                          <span className="group-kind">{getGroupTypeLabel(item.group.type)}</span>
+                        </td>
+                        <td className="image-cell">-</td>
+                        <td className="command-cell">-</td>
+                        <td className="created-cell">-</td>
+                        <td className="state-cell">
+                          <span className="group-status-pill">{groupCountLabel}</span>
+                        </td>
+                        <td className="ports-cell">-</td>
+                        <td className="networks-cell" title={item.group.network}>
+                          {item.group.network || '-'}
+                        </td>
+                      </tr>
+
+                      {!isCollapsed
+                        ? item.group.containers.map((container) => (
+                            <tr className="child-row" key={container.id}>
+                              <td className="id-cell" title={container.id}>
+                                <code>{container.id}</code>
+                              </td>
+                              <td className="strong-cell child-name-cell" title={container.name}>
+                                {getContainerDisplayName(container)}
+                              </td>
+                              <td className="image-cell" title={container.image}>
+                                {container.image || '-'}
+                              </td>
+                              <td className="command-cell" title={container.command}>
+                                {container.command || '-'}
+                              </td>
+                              <td className="created-cell">
+                                {translateDuration(container.runningFor) ||
+                                  container.createdAt ||
+                                  '-'}
+                              </td>
+                              <td className="state-cell">
+                                <span className="status-pill">
+                                  {translateDockerStatus(container.status) ||
+                                    translateDockerStatus(container.state) ||
+                                    '-'}
+                                </span>
+                              </td>
+                              <td className="ports-cell">{container.ports || '-'}</td>
+                              <td className="networks-cell" title={container.networks}>
+                                {container.networks || '-'}
+                              </td>
+                            </tr>
+                          ))
+                        : null}
+                    </Fragment>
+                  )
+                }
+
+                return (
+                  <tr key={item.container.id}>
+                    <td className="id-cell" title={item.container.id}>
+                      <code>{item.container.id}</code>
+                    </td>
+                    <td className="strong-cell" title={item.container.name}>
+                      {getContainerDisplayName(item.container)}
+                    </td>
+                    <td className="image-cell" title={item.container.image}>
+                      {item.container.image || '-'}
+                    </td>
+                    <td className="command-cell" title={item.container.command}>
+                      {item.container.command || '-'}
+                    </td>
+                    <td className="created-cell">
+                      {translateDuration(item.container.runningFor) ||
+                        item.container.createdAt ||
                         '-'}
-                    </span>
-                  </td>
-                  <td className="ports-cell">{container.ports || '-'}</td>
-                  <td className="networks-cell" title={container.networks}>
-                    {container.networks || '-'}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="state-cell">
+                      <span className="status-pill">
+                        {translateDockerStatus(item.container.status) ||
+                          translateDockerStatus(item.container.state) ||
+                          '-'}
+                      </span>
+                    </td>
+                    <td className="ports-cell">{item.container.ports || '-'}</td>
+                    <td className="networks-cell" title={item.container.networks}>
+                      {item.container.networks || '-'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

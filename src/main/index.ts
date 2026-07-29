@@ -18,6 +18,7 @@ type DockerPsRow = {
   Status?: string
   Names?: string
   Networks?: string
+  Labels?: string
 }
 
 type DockerContainer = {
@@ -31,6 +32,28 @@ type DockerContainer = {
   status: string
   name: string
   networks: string
+  labels: Record<string, string>
+  composeProject: string
+  composeService: string
+}
+
+function parseDockerLabels(labels: string): Record<string, string> {
+  return labels.split(',').reduce<Record<string, string>>((parsedLabels, label) => {
+    const separatorIndex = label.indexOf('=')
+
+    if (separatorIndex === -1) {
+      return parsedLabels
+    }
+
+    const key = label.slice(0, separatorIndex).trim()
+    const value = label.slice(separatorIndex + 1).trim()
+
+    if (key) {
+      parsedLabels[key] = value
+    }
+
+    return parsedLabels
+  }, {})
 }
 
 function parseDockerPsOutput(stdout: string): DockerContainer[] {
@@ -38,18 +61,25 @@ function parseDockerPsOutput(stdout: string): DockerContainer[] {
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line) as DockerPsRow)
-    .map((container) => ({
-      id: container.ID ?? '',
-      image: container.Image ?? '',
-      command: container.Command ?? '',
-      createdAt: container.CreatedAt ?? '',
-      runningFor: container.RunningFor ?? '',
-      ports: container.Ports ?? '',
-      state: container.State ?? '',
-      status: container.Status ?? '',
-      name: container.Names ?? '',
-      networks: container.Networks ?? ''
-    }))
+    .map((container) => {
+      const labels = parseDockerLabels(container.Labels ?? '')
+
+      return {
+        id: container.ID ?? '',
+        image: container.Image ?? '',
+        command: container.Command ?? '',
+        createdAt: container.CreatedAt ?? '',
+        runningFor: container.RunningFor ?? '',
+        ports: container.Ports ?? '',
+        state: container.State ?? '',
+        status: container.Status ?? '',
+        name: container.Names ?? '',
+        networks: container.Networks ?? '',
+        labels,
+        composeProject: labels['com.docker.compose.project'] ?? '',
+        composeService: labels['com.docker.compose.service'] ?? ''
+      }
+    })
 }
 
 async function listRunningDockerContainers(): Promise<DockerContainer[]> {
