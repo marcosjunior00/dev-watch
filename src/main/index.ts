@@ -1,13 +1,78 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+const execFileAsync = promisify(execFile)
+
+type DockerPsRow = {
+  ID?: string
+  Image?: string
+  Command?: string
+  CreatedAt?: string
+  RunningFor?: string
+  Ports?: string
+  State?: string
+  Status?: string
+  Names?: string
+  Networks?: string
+}
+
+type DockerContainer = {
+  id: string
+  image: string
+  command: string
+  createdAt: string
+  runningFor: string
+  ports: string
+  state: string
+  status: string
+  name: string
+  networks: string
+}
+
+function parseDockerPsOutput(stdout: string): DockerContainer[] {
+  return stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as DockerPsRow)
+    .map((container) => ({
+      id: container.ID ?? '',
+      image: container.Image ?? '',
+      command: container.Command ?? '',
+      createdAt: container.CreatedAt ?? '',
+      runningFor: container.RunningFor ?? '',
+      ports: container.Ports ?? '',
+      state: container.State ?? '',
+      status: container.Status ?? '',
+      name: container.Names ?? '',
+      networks: container.Networks ?? ''
+    }))
+}
+
+async function listRunningDockerContainers(): Promise<DockerContainer[]> {
+  try {
+    const { stdout } = await execFileAsync('docker', ['ps', '--format', '{{json .}}'], {
+      windowsHide: true,
+      timeout: 15000,
+      maxBuffer: 1024 * 1024 * 5
+    })
+
+    return parseDockerPsOutput(stdout)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Erro desconhecido ao executar docker ps.'
+    throw new Error(`Não foi possível listar os containers em execução. ${message}`)
+  }
+}
 
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1180,
+    height: 760,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -51,6 +116,7 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.handle('docker:list-running-containers', listRunningDockerContainers)
 
   createWindow()
 
