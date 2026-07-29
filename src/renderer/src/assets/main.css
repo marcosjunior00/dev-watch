@@ -136,6 +136,31 @@ h1 {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-color: #425046 #17191d;
+  scrollbar-width: thin;
+}
+
+.table-scroller::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroller::-webkit-scrollbar-track {
+  background: #17191d;
+}
+
+.table-scroller::-webkit-scrollbar-thumb {
+  border: 3px solid #17191d;
+  border-radius: 999px;
+  background: #425046;
+}
+
+.table-scroller::-webkit-scrollbar-thumb:hover {
+  background: #567060;
+}
+
+.table-scroller::-webkit-scrollbar-corner {
+  background: #17191d;
 }
 
 table {
