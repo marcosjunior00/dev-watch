@@ -4,6 +4,89 @@ type DockerContainer = Awaited<ReturnType<Window['api']['docker']['listRunningCo
 
 type LoadStatus = 'idle' | 'loading' | 'success' | 'error'
 
+const durationUnits = {
+  second: ['segundo', 'segundos'],
+  minute: ['minuto', 'minutos'],
+  hour: ['hora', 'horas'],
+  day: ['dia', 'dias'],
+  week: ['semana', 'semanas'],
+  month: ['mês', 'meses'],
+  year: ['ano', 'anos']
+} as const
+
+type DurationUnit = keyof typeof durationUnits
+
+function getDurationUnitLabel(unit: DurationUnit, amount: number): string {
+  const [singular, plural] = durationUnits[unit]
+  return amount === 1 ? singular : plural
+}
+
+function translateDuration(value: string): string {
+  if (!value) return ''
+
+  const hasAgoSuffix = /\sago\b/i.test(value)
+  let translated = value.trim().replace(/\sago\b/i, '')
+
+  translated = translated.replace(/\bless than a second\b/gi, 'menos de um segundo')
+
+  translated = translated.replace(
+    /\babout\s+an?\s+(second|minute|hour|day|week|month|year)s?\b/gi,
+    (_, unit: DurationUnit) => `cerca de 1 ${getDurationUnitLabel(unit, 1)}`
+  )
+
+  translated = translated.replace(
+    /\ban?\s+(second|minute|hour|day|week|month|year)s?\b/gi,
+    (_, unit: DurationUnit) => `1 ${getDurationUnitLabel(unit, 1)}`
+  )
+
+  translated = translated.replace(
+    /(\d+)\s+(second|minute|hour|day|week|month|year)s?\b/gi,
+    (_, amount: string, unit: DurationUnit) => {
+      const numericAmount = Number(amount)
+      return `${amount} ${getDurationUnitLabel(unit, numericAmount)}`
+    }
+  )
+
+  if (hasAgoSuffix || /^\d+|^cerca de|^menos de/i.test(translated)) {
+    return `há ${translated}`
+  }
+
+  return translated
+}
+
+function translateDockerStatus(value: string): string {
+  if (!value) return ''
+
+  let translated = value.trim()
+  translated = translated.replace(/\(healthy\)/gi, '(saudável)')
+  translated = translated.replace(/\(unhealthy\)/gi, '(não saudável)')
+  translated = translated.replace(/\(health: starting\)/gi, '(saúde: iniciando)')
+  translated = translated.replace(/\(starting\)/gi, '(iniciando)')
+
+  translated = translated.replace(/^Up\s+(.+)$/i, (_, duration: string) => {
+    return `Rodando ${translateDuration(duration)}`
+  })
+
+  translated = translated.replace(
+    /^Exited\s+\((\d+)\)\s+(.+)$/i,
+    (_, code: string, duration: string) => {
+      return `Encerrado (código ${code}) ${translateDuration(duration)}`
+    }
+  )
+
+  translated = translated.replace(/^Created$/i, 'Criado')
+  translated = translated.replace(/^Restarting\s+(.+)$/i, (_, duration: string) => {
+    return `Reiniciando ${translateDuration(duration)}`
+  })
+  translated = translated.replace(/^Paused\s+(.+)$/i, (_, duration: string) => {
+    return `Pausado ${translateDuration(duration)}`
+  })
+  translated = translated.replace(/^Dead$/i, 'Inativo')
+  translated = translated.replace(/^Removal In Progress$/i, 'Remoção em andamento')
+
+  return translated
+}
+
 function App(): React.JSX.Element {
   const [containers, setContainers] = useState<DockerContainer[]>([])
   const [status, setStatus] = useState<LoadStatus>('idle')
@@ -85,12 +168,12 @@ function App(): React.JSX.Element {
           <table>
             <thead>
               <tr>
-                <th>Container ID</th>
+                <th>ID do container</th>
                 <th>Nome</th>
                 <th>Imagem</th>
                 <th>Comando</th>
                 <th>Criado</th>
-                <th>Status</th>
+                <th>Estado</th>
                 <th>Portas</th>
                 <th>Redes</th>
               </tr>
@@ -104,10 +187,12 @@ function App(): React.JSX.Element {
                   <td className="strong-cell">{container.name || '-'}</td>
                   <td>{container.image || '-'}</td>
                   <td className="command-cell">{container.command || '-'}</td>
-                  <td>{container.runningFor || container.createdAt || '-'}</td>
+                  <td>{translateDuration(container.runningFor) || container.createdAt || '-'}</td>
                   <td>
                     <span className="status-pill">
-                      {container.status || container.state || '-'}
+                      {translateDockerStatus(container.status) ||
+                        translateDockerStatus(container.state) ||
+                        '-'}
                     </span>
                   </td>
                   <td className="ports-cell">{container.ports || '-'}</td>
