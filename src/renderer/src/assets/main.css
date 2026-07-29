@@ -215,7 +215,7 @@ td {
   padding: 13px 14px;
   border-bottom: 1px solid #2c3036;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 th {
@@ -255,6 +255,9 @@ tbody tr:hover {
 
 .group-row td {
   border-bottom-color: #39404a;
+  height: 52px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .child-row td {
@@ -272,6 +275,7 @@ tbody tr:hover {
 .group-name-cell {
   display: flex;
   min-width: 0;
+  height: 28px;
   align-items: center;
   gap: 8px;
   color: #ffffff;

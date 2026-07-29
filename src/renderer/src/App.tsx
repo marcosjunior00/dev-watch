@@ -340,26 +340,28 @@ function App(): React.JSX.Element {
                         <td className="id-cell">
                           <span className="group-placeholder">-</span>
                         </td>
-                        <td className="group-name-cell" title={item.group.name}>
-                          <button
-                            className="group-toggle"
-                            type="button"
-                            aria-label={
-                              isCollapsed
-                                ? `Expandir grupo ${item.group.name}`
-                                : `Recolher grupo ${item.group.name}`
-                            }
-                            onClick={() => toggleGroup(item.group.id)}
-                          >
-                            <span
-                              className={
-                                isCollapsed ? 'group-chevron' : 'group-chevron is-expanded'
+                        <td title={item.group.name}>
+                          <div className="group-name-cell">
+                            <button
+                              className="group-toggle"
+                              type="button"
+                              aria-label={
+                                isCollapsed
+                                  ? `Expandir grupo ${item.group.name}`
+                                  : `Recolher grupo ${item.group.name}`
                               }
-                            />
-                          </button>
-                          <span className="group-status-dot" />
-                          <span className="group-name">{item.group.name}</span>
-                          <span className="group-kind">{getGroupTypeLabel(item.group.type)}</span>
+                              onClick={() => toggleGroup(item.group.id)}
+                            >
+                              <span
+                                className={
+                                  isCollapsed ? 'group-chevron' : 'group-chevron is-expanded'
+                                }
+                              />
+                            </button>
+                            <span className="group-status-dot" />
+                            <span className="group-name">{item.group.name}</span>
+                            <span className="group-kind">{getGroupTypeLabel(item.group.type)}</span>
+                          </div>
                         </td>
                         <td className="image-cell">-</td>
                         <td className="command-cell">-</td>
