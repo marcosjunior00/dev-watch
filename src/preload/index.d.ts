@@ -16,9 +16,25 @@ export type DockerContainer = {
   composeService: string
 }
 
+export type UsedPort = {
+  protocol: 'TCP' | 'UDP'
+  localAddress: string
+  localPort: number
+  remoteAddress: string
+  remotePort: number | null
+  state: string
+  pid: number
+  processName: string
+  processPath: string
+  commandLine: string
+}
+
 export type AppAPI = {
   docker: {
     listRunningContainers: () => Promise<DockerContainer[]>
+  }
+  system: {
+    listUsedPorts: () => Promise<UsedPort[]>
   }
 }
 

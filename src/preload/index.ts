@@ -5,6 +5,9 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   docker: {
     listRunningContainers: () => ipcRenderer.invoke('docker:list-running-containers')
+  },
+  system: {
+    listUsedPorts: () => ipcRenderer.invoke('system:list-used-ports')
   }
 }
 

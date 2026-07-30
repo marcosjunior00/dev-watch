@@ -37,6 +37,21 @@ type DockerContainer = {
   composeService: string
 }
 
+type UsedPort = {
+  protocol: 'TCP' | 'UDP'
+  localAddress: string
+  localPort: number
+  remoteAddress: string
+  remotePort: number | null
+  state: string
+  pid: number
+  processName: string
+  processPath: string
+  commandLine: string
+}
+
+type UsedPortRow = Partial<UsedPort>
+
 function parseDockerLabels(labels: string): Record<string, string> {
   return labels.split(',').reduce<Record<string, string>>((parsedLabels, label) => {
     const separatorIndex = label.indexOf('=')
@@ -98,6 +113,113 @@ async function listRunningDockerContainers(): Promise<DockerContainer[]> {
   }
 }
 
+function parseUsedPortsOutput(stdout: string): UsedPort[] {
+  if (!stdout.trim()) {
+    return []
+  }
+
+  const parsedOutput = JSON.parse(stdout) as UsedPortRow | UsedPortRow[]
+  const rows = Array.isArray(parsedOutput) ? parsedOutput : [parsedOutput]
+
+  return rows.map((port) => ({
+    protocol: port.protocol === 'UDP' ? 'UDP' : 'TCP',
+    localAddress: port.localAddress ?? '',
+    localPort: Number(port.localPort ?? 0),
+    remoteAddress: port.remoteAddress ?? '',
+    remotePort:
+      port.remotePort === null || port.remotePort === undefined ? null : Number(port.remotePort),
+    state: port.state ?? '',
+    pid: Number(port.pid ?? 0),
+    processName: port.processName ?? '',
+    processPath: port.processPath ?? '',
+    commandLine: port.commandLine ?? ''
+  }))
+}
+
+async function listUsedPorts(): Promise<UsedPort[]> {
+  if (process.platform !== 'win32') {
+    throw new Error('A leitura detalhada de portas ainda está disponível apenas no Windows.')
+  }
+
+  const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+$commandLines = @{}
+try {
+  Get-CimInstance Win32_Process | ForEach-Object {
+    $commandLines[[int]$_.ProcessId] = [string]$_.CommandLine
+  }
+} catch {}
+
+function Get-ProcessInfo($processId) {
+  $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+  $path = ''
+  if ($process) {
+    try { $path = [string]$process.Path } catch {}
+  }
+
+  return @{
+    Name = if ($process) { [string]$process.ProcessName } else { '' }
+    Path = $path
+    CommandLine = if ($commandLines.ContainsKey([int]$processId)) { [string]$commandLines[[int]$processId] } else { '' }
+  }
+}
+
+$tcpPorts = Get-NetTCPConnection | ForEach-Object {
+  $info = Get-ProcessInfo $_.OwningProcess
+  [PSCustomObject]@{
+    protocol = 'TCP'
+    localAddress = [string]$_.LocalAddress
+    localPort = [int]$_.LocalPort
+    remoteAddress = [string]$_.RemoteAddress
+    remotePort = [int]$_.RemotePort
+    state = [string]$_.State
+    pid = [int]$_.OwningProcess
+    processName = $info.Name
+    processPath = $info.Path
+    commandLine = $info.CommandLine
+  }
+}
+
+$udpPorts = Get-NetUDPEndpoint | ForEach-Object {
+  $info = Get-ProcessInfo $_.OwningProcess
+  [PSCustomObject]@{
+    protocol = 'UDP'
+    localAddress = [string]$_.LocalAddress
+    localPort = [int]$_.LocalPort
+    remoteAddress = ''
+    remotePort = $null
+    state = 'Em uso'
+    pid = [int]$_.OwningProcess
+    processName = $info.Name
+    processPath = $info.Path
+    commandLine = $info.CommandLine
+  }
+}
+
+@($tcpPorts + $udpPorts) |
+  Sort-Object localPort, protocol, processName |
+  ConvertTo-Json -Depth 4 -Compress
+`
+
+  try {
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      {
+        windowsHide: true,
+        timeout: 30000,
+        maxBuffer: 1024 * 1024 * 20
+      }
+    )
+
+    return parseUsedPortsOutput(stdout)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Erro desconhecido ao consultar portas em uso.'
+    throw new Error(`Não foi possível listar as portas em uso. ${message}`)
+  }
+}
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -147,6 +269,7 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
   ipcMain.handle('docker:list-running-containers', listRunningDockerContainers)
+  ipcMain.handle('system:list-used-ports', listUsedPorts)
 
   createWindow()
 

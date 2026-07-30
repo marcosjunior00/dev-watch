@@ -79,6 +79,38 @@ h1 {
   opacity: 0.72;
 }
 
+.tabs {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px;
+  border: 1px solid #30343a;
+  border-radius: 8px;
+  background: #1b1e23;
+}
+
+.tab-button {
+  min-width: 118px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #a7acb5;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.tab-button:hover {
+  color: #f7f7ef;
+  background: #242930;
+}
+
+.tab-button.is-active {
+  border-color: #365747;
+  color: #b7f0d2;
+  background: #173528;
+}
+
 .summary-bar {
   display: flex;
   align-items: center;
@@ -170,6 +202,10 @@ table {
   table-layout: fixed;
 }
 
+.ports-table {
+  min-width: 1680px;
+}
+
 .id-column {
   width: 130px;
 }
@@ -200,6 +236,39 @@ table {
 
 .networks-column {
   width: 190px;
+}
+
+.port-protocol-column {
+  width: 110px;
+}
+
+.port-number-column {
+  width: 90px;
+}
+
+.port-local-column,
+.port-remote-column {
+  width: 190px;
+}
+
+.port-state-column {
+  width: 150px;
+}
+
+.port-pid-column {
+  width: 90px;
+}
+
+.port-process-column {
+  width: 210px;
+}
+
+.port-path-column {
+  width: 330px;
+}
+
+.port-command-column {
+  width: 320px;
 }
 
 thead {
@@ -410,6 +479,65 @@ tbody tr:hover {
   line-height: 1.2;
   overflow-wrap: normal;
   word-break: normal;
+}
+
+.protocol-pill,
+.port-state-pill {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.protocol-pill {
+  border: 1px solid #35465c;
+  color: #c8dcff;
+  background: #172338;
+}
+
+.port-state-pill {
+  border: 1px solid #365747;
+  color: #b7f0d2;
+  background: #173528;
+}
+
+.port-number-cell,
+.pid-cell,
+.endpoint-cell,
+.path-cell,
+.command-line-cell {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    Liberation Mono,
+    monospace;
+  font-size: 12px;
+}
+
+.port-number-cell {
+  color: #9bd8bc;
+  font-weight: 800;
+}
+
+.pid-cell {
+  color: #d6d9df;
+}
+
+.endpoint-cell,
+.path-cell,
+.command-line-cell {
+  overflow: hidden;
+  color: #c8ccd4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
 }
 
 .empty-state {
