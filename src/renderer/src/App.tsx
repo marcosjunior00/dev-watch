@@ -29,6 +29,29 @@ type ContainerListItem =
       firstIndex: number
     }
 
+const skeletonRowCount = 8
+const containerSkeletonCellWidths = [
+  '56%',
+  '68%',
+  '82%',
+  '74%',
+  '58%',
+  '70%',
+  '88%',
+  '64%'
+] as const
+const portSkeletonCellWidths = [
+  '54%',
+  '42%',
+  '70%',
+  '66%',
+  '58%',
+  '44%',
+  '72%',
+  '84%',
+  '78%'
+] as const
+
 const durationUnits = {
   second: ['segundo', 'segundos'],
   minute: ['minuto', 'minutos'],
@@ -251,6 +274,28 @@ function buildContainerList(containers: DockerContainer[]): ContainerListItem[] 
   return [...standaloneItems, ...groupedItems].sort((a, b) => a.firstIndex - b.firstIndex)
 }
 
+function TableSkeletonRows({
+  cellWidths,
+  rowCount = skeletonRowCount
+}: {
+  cellWidths: readonly string[]
+  rowCount?: number
+}): React.JSX.Element {
+  return (
+    <>
+      {Array.from({ length: rowCount }, (_, rowIndex) => (
+        <tr className="skeleton-row" key={`skeleton-row-${rowIndex}`} aria-hidden="true">
+          {cellWidths.map((width, cellIndex) => (
+            <td key={`skeleton-cell-${rowIndex}-${cellIndex}`}>
+              <span className="skeleton-line" style={{ width }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  )
+}
+
 function App(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('containers')
   const [containers, setContainers] = useState<DockerContainer[]>([])
@@ -267,6 +312,8 @@ function App(): React.JSX.Element {
   const activeTitle = activeTab === 'containers' ? 'Containers em execução' : 'Portas em uso'
   const activeUpdatedAt = activeTab === 'containers' ? updatedAt : portsUpdatedAt
   const activeErrorMessage = activeTab === 'containers' ? errorMessage : portsErrorMessage
+  const activeItemCount = activeTab === 'containers' ? containers.length : ports.length
+  const showSkeleton = isLoading && activeItemCount === 0 && !activeErrorMessage
 
   const containerCountLabel = useMemo(() => {
     const count = containers.length
@@ -382,11 +429,12 @@ function App(): React.JSX.Element {
         </div>
 
         <button
-          className="refresh-button"
+          className={isLoading ? 'refresh-button is-loading' : 'refresh-button'}
           type="button"
           disabled={isLoading}
           onClick={refreshActiveTab}
         >
+          {isLoading ? <span className="refresh-spinner" aria-hidden="true" /> : null}
           {isLoading ? 'Atualizando...' : 'Atualizar'}
         </button>
       </header>
@@ -408,24 +456,38 @@ function App(): React.JSX.Element {
         </button>
       </nav>
 
-      <section className="summary-bar" aria-live="polite">
+      <section className="summary-bar" aria-busy={isLoading} aria-live="polite">
         <div>
-          <span className="summary-label">{activeSummaryLabel}</span>
-          <strong>{activeCountLabel}</strong>
+          {showSkeleton ? (
+            <div className="summary-skeleton" aria-hidden="true">
+              <span className="skeleton-line summary-skeleton-label" />
+              <span className="skeleton-line summary-skeleton-count" />
+            </div>
+          ) : (
+            <>
+              <span className="summary-label">{activeSummaryLabel}</span>
+              <strong>{activeCountLabel}</strong>
+            </>
+          )}
         </div>
 
         <div className="summary-meta">
-          {activeUpdatedAt
-            ? `Atualizado às ${activeUpdatedAt.toLocaleTimeString('pt-BR')}`
-            : 'Aguardando leitura'}
+          {showSkeleton ? (
+            <span className="skeleton-line summary-skeleton-meta" aria-hidden="true" />
+          ) : activeUpdatedAt ? (
+            `Atualizado às ${activeUpdatedAt.toLocaleTimeString('pt-BR')}`
+          ) : (
+            'Aguardando leitura'
+          )}
         </div>
+        {showSkeleton ? <span className="visually-hidden">Carregando dados...</span> : null}
       </section>
 
       {activeErrorMessage ? <div className="error-banner">{activeErrorMessage}</div> : null}
 
       {activeTab === 'containers' ? (
         <section className="container-panel">
-          <div className="table-scroller">
+          <div className="table-scroller" aria-busy={isLoading}>
             <table>
               <colgroup>
                 <col className="id-column" />
@@ -450,129 +512,136 @@ function App(): React.JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {containerList.map((item) => {
-                  if (item.type === 'group') {
-                    const isCollapsed = collapsedGroupIds.has(item.group.id)
-                    const containerCount = item.group.containers.length
-                    const groupCountLabel =
-                      containerCount === 1
-                        ? '1 container rodando'
-                        : `${containerCount} containers rodando`
+                {showSkeleton ? (
+                  <TableSkeletonRows cellWidths={containerSkeletonCellWidths} />
+                ) : null}
+                {!showSkeleton &&
+                  containerList.map((item) => {
+                    if (item.type === 'group') {
+                      const isCollapsed = collapsedGroupIds.has(item.group.id)
+                      const containerCount = item.group.containers.length
+                      const groupCountLabel =
+                        containerCount === 1
+                          ? '1 container rodando'
+                          : `${containerCount} containers rodando`
+
+                      return (
+                        <Fragment key={item.group.id}>
+                          <tr className="group-row">
+                            <td className="id-cell">
+                              <span className="group-placeholder">-</span>
+                            </td>
+                            <td title={item.group.name}>
+                              <div className="group-name-cell">
+                                <button
+                                  className="group-toggle"
+                                  type="button"
+                                  aria-label={
+                                    isCollapsed
+                                      ? `Expandir grupo ${item.group.name}`
+                                      : `Recolher grupo ${item.group.name}`
+                                  }
+                                  onClick={() => toggleGroup(item.group.id)}
+                                >
+                                  <span
+                                    className={
+                                      isCollapsed ? 'group-chevron' : 'group-chevron is-expanded'
+                                    }
+                                  />
+                                </button>
+                                <span className="group-status-dot" />
+                                <span className="group-name">{item.group.name}</span>
+                                <span className="group-kind">
+                                  {getGroupTypeLabel(item.group.type)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="image-cell">-</td>
+                            <td className="command-cell">-</td>
+                            <td className="created-cell">-</td>
+                            <td className="state-cell">
+                              <span className="group-status-pill">{groupCountLabel}</span>
+                            </td>
+                            <td className="ports-cell">-</td>
+                            <td className="networks-cell" title={item.group.network}>
+                              {item.group.network || '-'}
+                            </td>
+                          </tr>
+
+                          {!isCollapsed
+                            ? item.group.containers.map((container) => (
+                                <tr className="child-row" key={container.id}>
+                                  <td className="id-cell" title={container.id}>
+                                    <code>{container.id}</code>
+                                  </td>
+                                  <td
+                                    className="strong-cell child-name-cell"
+                                    title={container.name}
+                                  >
+                                    {getContainerDisplayName(container)}
+                                  </td>
+                                  <td className="image-cell" title={container.image}>
+                                    {container.image || '-'}
+                                  </td>
+                                  <td className="command-cell" title={container.command}>
+                                    {container.command || '-'}
+                                  </td>
+                                  <td className="created-cell">
+                                    {translateDuration(container.runningFor) ||
+                                      container.createdAt ||
+                                      '-'}
+                                  </td>
+                                  <td className="state-cell">
+                                    <span className="status-pill">
+                                      {translateDockerStatus(container.status) ||
+                                        translateDockerStatus(container.state) ||
+                                        '-'}
+                                    </span>
+                                  </td>
+                                  <td className="ports-cell">{container.ports || '-'}</td>
+                                  <td className="networks-cell" title={container.networks}>
+                                    {container.networks || '-'}
+                                  </td>
+                                </tr>
+                              ))
+                            : null}
+                        </Fragment>
+                      )
+                    }
 
                     return (
-                      <Fragment key={item.group.id}>
-                        <tr className="group-row">
-                          <td className="id-cell">
-                            <span className="group-placeholder">-</span>
-                          </td>
-                          <td title={item.group.name}>
-                            <div className="group-name-cell">
-                              <button
-                                className="group-toggle"
-                                type="button"
-                                aria-label={
-                                  isCollapsed
-                                    ? `Expandir grupo ${item.group.name}`
-                                    : `Recolher grupo ${item.group.name}`
-                                }
-                                onClick={() => toggleGroup(item.group.id)}
-                              >
-                                <span
-                                  className={
-                                    isCollapsed ? 'group-chevron' : 'group-chevron is-expanded'
-                                  }
-                                />
-                              </button>
-                              <span className="group-status-dot" />
-                              <span className="group-name">{item.group.name}</span>
-                              <span className="group-kind">
-                                {getGroupTypeLabel(item.group.type)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="image-cell">-</td>
-                          <td className="command-cell">-</td>
-                          <td className="created-cell">-</td>
-                          <td className="state-cell">
-                            <span className="group-status-pill">{groupCountLabel}</span>
-                          </td>
-                          <td className="ports-cell">-</td>
-                          <td className="networks-cell" title={item.group.network}>
-                            {item.group.network || '-'}
-                          </td>
-                        </tr>
-
-                        {!isCollapsed
-                          ? item.group.containers.map((container) => (
-                              <tr className="child-row" key={container.id}>
-                                <td className="id-cell" title={container.id}>
-                                  <code>{container.id}</code>
-                                </td>
-                                <td className="strong-cell child-name-cell" title={container.name}>
-                                  {getContainerDisplayName(container)}
-                                </td>
-                                <td className="image-cell" title={container.image}>
-                                  {container.image || '-'}
-                                </td>
-                                <td className="command-cell" title={container.command}>
-                                  {container.command || '-'}
-                                </td>
-                                <td className="created-cell">
-                                  {translateDuration(container.runningFor) ||
-                                    container.createdAt ||
-                                    '-'}
-                                </td>
-                                <td className="state-cell">
-                                  <span className="status-pill">
-                                    {translateDockerStatus(container.status) ||
-                                      translateDockerStatus(container.state) ||
-                                      '-'}
-                                  </span>
-                                </td>
-                                <td className="ports-cell">{container.ports || '-'}</td>
-                                <td className="networks-cell" title={container.networks}>
-                                  {container.networks || '-'}
-                                </td>
-                              </tr>
-                            ))
-                          : null}
-                      </Fragment>
-                    )
-                  }
-
-                  return (
-                    <tr key={item.container.id}>
-                      <td className="id-cell" title={item.container.id}>
-                        <code>{item.container.id}</code>
-                      </td>
-                      <td className="strong-cell" title={item.container.name}>
-                        {getContainerDisplayName(item.container)}
-                      </td>
-                      <td className="image-cell" title={item.container.image}>
-                        {item.container.image || '-'}
-                      </td>
-                      <td className="command-cell" title={item.container.command}>
-                        {item.container.command || '-'}
-                      </td>
-                      <td className="created-cell">
-                        {translateDuration(item.container.runningFor) ||
-                          item.container.createdAt ||
-                          '-'}
-                      </td>
-                      <td className="state-cell">
-                        <span className="status-pill">
-                          {translateDockerStatus(item.container.status) ||
-                            translateDockerStatus(item.container.state) ||
+                      <tr key={item.container.id}>
+                        <td className="id-cell" title={item.container.id}>
+                          <code>{item.container.id}</code>
+                        </td>
+                        <td className="strong-cell" title={item.container.name}>
+                          {getContainerDisplayName(item.container)}
+                        </td>
+                        <td className="image-cell" title={item.container.image}>
+                          {item.container.image || '-'}
+                        </td>
+                        <td className="command-cell" title={item.container.command}>
+                          {item.container.command || '-'}
+                        </td>
+                        <td className="created-cell">
+                          {translateDuration(item.container.runningFor) ||
+                            item.container.createdAt ||
                             '-'}
-                        </span>
-                      </td>
-                      <td className="ports-cell">{item.container.ports || '-'}</td>
-                      <td className="networks-cell" title={item.container.networks}>
-                        {item.container.networks || '-'}
-                      </td>
-                    </tr>
-                  )
-                })}
+                        </td>
+                        <td className="state-cell">
+                          <span className="status-pill">
+                            {translateDockerStatus(item.container.status) ||
+                              translateDockerStatus(item.container.state) ||
+                              '-'}
+                          </span>
+                        </td>
+                        <td className="ports-cell">{item.container.ports || '-'}</td>
+                        <td className="networks-cell" title={item.container.networks}>
+                          {item.container.networks || '-'}
+                        </td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>
@@ -583,7 +652,7 @@ function App(): React.JSX.Element {
         </section>
       ) : (
         <section className="container-panel">
-          <div className="table-scroller">
+          <div className="table-scroller" aria-busy={isLoading}>
             <table className="ports-table">
               <colgroup>
                 <col className="port-protocol-column" />
@@ -610,33 +679,35 @@ function App(): React.JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {ports.map((port) => (
-                  <tr key={`${port.protocol}:${port.localAddress}:${port.localPort}:${port.pid}`}>
-                    <td>
-                      <span className="protocol-pill">{port.protocol}</span>
-                    </td>
-                    <td className="port-number-cell">{port.localPort}</td>
-                    <td className="endpoint-cell" title={formatLocalEndpoint(port)}>
-                      {formatLocalEndpoint(port)}
-                    </td>
-                    <td className="endpoint-cell" title={formatRemoteEndpoint(port)}>
-                      {formatRemoteEndpoint(port)}
-                    </td>
-                    <td>
-                      <span className="port-state-pill">{translatePortState(port.state)}</span>
-                    </td>
-                    <td className="pid-cell">{port.pid || '-'}</td>
-                    <td className="strong-cell" title={formatProcessName(port)}>
-                      {formatProcessName(port)}
-                    </td>
-                    <td className="path-cell" title={port.processPath}>
-                      {port.processPath || '-'}
-                    </td>
-                    <td className="command-line-cell" title={port.commandLine}>
-                      {port.commandLine || '-'}
-                    </td>
-                  </tr>
-                ))}
+                {showSkeleton ? <TableSkeletonRows cellWidths={portSkeletonCellWidths} /> : null}
+                {!showSkeleton &&
+                  ports.map((port) => (
+                    <tr key={`${port.protocol}:${port.localAddress}:${port.localPort}:${port.pid}`}>
+                      <td>
+                        <span className="protocol-pill">{port.protocol}</span>
+                      </td>
+                      <td className="port-number-cell">{port.localPort}</td>
+                      <td className="endpoint-cell" title={formatLocalEndpoint(port)}>
+                        {formatLocalEndpoint(port)}
+                      </td>
+                      <td className="endpoint-cell" title={formatRemoteEndpoint(port)}>
+                        {formatRemoteEndpoint(port)}
+                      </td>
+                      <td>
+                        <span className="port-state-pill">{translatePortState(port.state)}</span>
+                      </td>
+                      <td className="pid-cell">{port.pid || '-'}</td>
+                      <td className="strong-cell" title={formatProcessName(port)}>
+                        {formatProcessName(port)}
+                      </td>
+                      <td className="path-cell" title={port.processPath}>
+                        {port.processPath || '-'}
+                      </td>
+                      <td className="command-line-cell" title={port.commandLine}>
+                        {port.commandLine || '-'}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

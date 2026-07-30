@@ -59,6 +59,10 @@ h1 {
 }
 
 .refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-width: 126px;
   height: 40px;
   border: 1px solid #3d4a43;
@@ -77,6 +81,20 @@ h1 {
 .refresh-button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.refresh-button.is-loading {
+  min-width: 142px;
+}
+
+.refresh-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid rgba(247, 247, 239, 0.28);
+  border-top-color: #f7f7ef;
+  border-radius: 999px;
+  animation: spin 760ms linear infinite;
 }
 
 .tabs {
@@ -141,6 +159,38 @@ h1 {
   color: #a7acb5;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.summary-skeleton {
+  display: flex;
+  min-width: 190px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-skeleton-label {
+  width: 70px;
+  height: 13px;
+}
+
+.summary-skeleton-count {
+  width: 180px;
+  height: 21px;
+}
+
+.summary-skeleton-meta {
+  width: 146px;
+  height: 14px;
+}
+
+.skeleton-line {
+  display: block;
+  height: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(183, 240, 210, 0.16), transparent), #2a2f35;
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.25s ease-in-out infinite;
 }
 
 .error-banner {
@@ -312,6 +362,23 @@ td code {
 
 tbody tr:hover {
   background: #20242a;
+}
+
+.skeleton-row {
+  pointer-events: none;
+}
+
+.skeleton-row td {
+  height: 49px;
+  background: #171a1f;
+}
+
+.skeleton-row:nth-child(odd) td {
+  background: #1b1e23;
+}
+
+.skeleton-row:hover {
+  background: transparent;
 }
 
 .group-row {
@@ -548,6 +615,32 @@ tbody tr:hover {
   padding: 24px;
   color: #a7acb5;
   font-size: 14px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 860px) {
